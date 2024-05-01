@@ -43,8 +43,8 @@ class AirportGraph:
         dlon = lon2 - lon1
 
         # Fórmula de la haversine
-        a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-        c = 2 * atan2(sqrt(a), sqrt(1-a))
+        a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
+        c = 2 * atan2(sqrt(a), sqrt(1 - a))
         distance = 6371 * c  # Radio de la Tierra en km
 
         return distance
@@ -54,7 +54,7 @@ def build_airport_graph(csv_filename):
     airport_graph = AirportGraph()
 
     with open(csv_filename, 'r', encoding='utf-8') as archivo_csv:
-        lector_csv = csv.reader(archivo_csv, delimiter=',')
+        lector_csv = csv.reader(archivo_csv)
         next(lector_csv)  # Saltar la fila de encabezados
 
         for fila in lector_csv:
