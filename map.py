@@ -10,6 +10,9 @@ imagen_original = Image.open("Mercator.jpg")
 # Escala inicial de la imagen (sin zoom)
 zoom_scale = 1.0
 
+# Posición inicial de la imagen
+image_x, image_y = 0, 0
+
 # Cargar los aeropuertos y vuelos desde el archivo CSV
 ruta_csv = "flights.csv"
 airport_graph = build_airport_graph(ruta_csv)
@@ -56,7 +59,10 @@ def actualizar_imagen():
     
     # Actualizar el widget Label con la nueva imagen
     label_imagen.configure(image=imagen_tk)
-    label_imagen.image = imagen_tk  # Guardar una referencia para evitar que la imagen sea eliminada por el recolector de basura
+    # Ajustar la posición de la imagen
+    label_imagen.place(x=image_x, y=image_y, width=new_width, height=new_height)
+    # Guardar una referencia para evitar que la imagen sea eliminada por el recolector de basura
+    label_imagen.image = imagen_tk
 
 # Función para dibujar los aeropuertos en la imagen
 def dibujar_aeropuertos():
@@ -95,6 +101,9 @@ def dibujar_adyacentes_y_lejanos():
     # Obtener el código de origen ingresado por el usuario
     source_code = entry_source.get().strip().upper()
 
+    # Limpiar la lista de aeropuertos adyacentes
+    lista_adyacentes.delete(0, tk.END)
+
     # Verificar si el código de aeropuerto existe en el diccionario
     if source_code not in aeropuertos:
         print(f"El código de aeropuerto {source_code} no existe.")
@@ -110,21 +119,25 @@ def dibujar_adyacentes_y_lejanos():
     # Obtener los vuelos que salen desde el aeropuerto de origen
     flights_from_source = airport_graph.get_connections(source_code)
 
-    # Crear una lista para almacenar las distancias de los vuelos
+    # Crear un conjunto para almacenar los destinos únicos y una lista para distancias
+    destinos_unicos = set()
     distances = []
 
     # Iterar sobre los vuelos que salen desde el aeropuerto de origen
     for flight in flights_from_source:
         # Calcular la distancia entre los aeropuertos de origen y destino
         distancia = airport_graph.calculate_distance(flight.source_airport, flight.dest_airport)
-
-        # Almacenar la distancia junto con el vuelo correspondiente
-        distances.append((distancia, flight))
+        
+        # Si el destino no está en el conjunto de destinos únicos, añádelo
+        if flight.dest_airport.code not in destinos_unicos:
+            destinos_unicos.add(flight.dest_airport.code)
+            # Almacenar la distancia junto con el vuelo correspondiente
+            distances.append((distancia, flight))
 
     # Ordenar los vuelos por distancia descendente
     distances.sort(reverse=True, key=lambda x: x[0])
 
-    # Obtener los 10 vuelos más lejanos
+    # Asegurarnos de obtener los 10 vuelos más lejanos disponibles
     top_10_flights = distances[:10]
 
     # Dibujar todos los vuelos adyacentes en azul
@@ -139,6 +152,9 @@ def dibujar_adyacentes_y_lejanos():
 
         # Dibujar la línea de vuelo en azul
         draw.line([(x1, y1), (x2, y2)], fill="blue", width=1)
+
+        # Añadir el aeropuerto adyacente a la lista
+        lista_adyacentes.insert(tk.END, f"Destino: {vuelo.dest_airport.code} Distancia: {distancia:.2f} km")
 
     # Resaltar los 10 vuelos más lejanos en rojo
     for distancia, vuelo in top_10_flights:
@@ -156,6 +172,8 @@ def dibujar_adyacentes_y_lejanos():
     # Actualizar la imagen mostrada en el mapa
     actualizar_imagen_con_dibujos(imagen_con_lineas)
 
+
+
 # Función para actualizar la imagen mostrada en el mapa con dibujos adicionales
 def actualizar_imagen_con_dibujos(imagen_con_dibujos):
     # Redimensionar la imagen según la escala actual
@@ -169,7 +187,28 @@ def actualizar_imagen_con_dibujos(imagen_con_dibujos):
 
     # Actualizar el widget Label con la nueva imagen
     label_imagen.configure(image=imagen_tk)
-    label_imagen.image = imagen_tk  # Guardar una referencia para evitar que la imagen sea eliminada por el recolector de basura
+    # Ajustar la posición de la imagen
+    label_imagen.place(x=image_x, y=image_y, width=new_width, height=new_height)
+    # Guardar una referencia para evitar que la imagen sea eliminada por el recolector de basura
+    label_imagen.image = imagen_tk
+
+# Funciones para manejar el desplazamiento del mouse
+def start_pan(event):
+    global prev_x, prev_y
+    prev_x, prev_y = event.x, event.y
+
+def pan_image(event):
+    global image_x, image_y, prev_x, prev_y
+    # Calcular el desplazamiento del mouse
+    delta_x = event.x - prev_x
+    delta_y = event.y - prev_y
+    # Actualizar la posición de la imagen
+    image_x += delta_x
+    image_y += delta_y
+    # Actualizar la imagen mostrada
+    actualizar_imagen()
+    # Actualizar la posición del mouse
+    prev_x, prev_y = event.x, event.y
 
 # Crear la ventana de Tkinter
 raiz = tk.Tk()
@@ -179,19 +218,29 @@ raiz.title("Flights map")
 label_imagen = tk.Label(raiz)
 label_imagen.grid(row=0, column=0, sticky="nsew")
 
-# Crear un marco para los botones y colocarlo en el lado derecho
-frame_botones = tk.Frame(raiz)
-frame_botones.grid(row=0, column=1, sticky="ns")
-
 # Configurar las filas y columnas para que se expandan adecuadamente
 raiz.columnconfigure(0, weight=1)
 raiz.rowconfigure(0, weight=1)
+
+# Asignar funciones de manejo de eventos de mouse a la imagen
+label_imagen.bind("<ButtonPress-1>", start_pan)
+label_imagen.bind("<B1-Motion>", pan_image)
+
+# Crear un marco para los botones y colocarlo en el lado derecho
+frame_botones = tk.Frame(raiz)
+frame_botones.grid(row=0, column=1, sticky="ns")
 
 # Crear campos de texto para los códigos de aeropuerto de origen
 label_source = tk.Label(frame_botones, text="Source Code:")
 label_source.pack(pady=5)
 entry_source = tk.Entry(frame_botones)
 entry_source.pack(pady=5)
+
+# Crear una lista para mostrar los aeropuertos adyacentes
+label_adyacentes = tk.Label(frame_botones, text="Aeropuertos adyacentes:")
+label_adyacentes.pack(pady=5)
+lista_adyacentes = tk.Listbox(frame_botones, width=40)
+lista_adyacentes.pack(pady=5)
 
 # Botón para dibujar los vuelos adyacentes y resaltar los 10 más lejanos
 boton_dibujar_adyacentes = tk.Button(frame_botones, text="Dibujar adyacentes y lejanos", command=dibujar_adyacentes_y_lejanos)
