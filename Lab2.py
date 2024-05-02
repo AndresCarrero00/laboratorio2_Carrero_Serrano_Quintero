@@ -71,6 +71,7 @@ class AirportGraph:
             # Extraer el nodo con la menor distancia
             current_distance, current_airport = heapq.heappop(priority_queue)
 
+            #edgar
             # Si el nodo actual es el destino, detener el algoritmo
             if current_airport == dest_code:
                 break
