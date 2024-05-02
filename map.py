@@ -210,6 +210,38 @@ def pan_image(event):
     # Actualizar la posición del mouse
     prev_x, prev_y = event.x, event.y
 
+# Función para calcular y dibujar el camino mínimo
+def calcular_camino_minimo():
+    # Obtener los códigos de origen y destino
+    source_code = entry_source.get().strip().upper()
+    dest_code = entry_destino.get().strip().upper()
+
+    # Calcular el camino mínimo
+    path = airport_graph.shortest_path(source_code, dest_code)
+
+    # Copiar la imagen original para dibujar el camino mínimo
+    imagen_con_camino = imagen_original.copy()
+    draw = ImageDraw.Draw(imagen_con_camino)
+
+    # Obtener dimensiones de la imagen
+    image_width, image_height = imagen_con_camino.size
+
+    # Dibujar el camino mínimo en la imagen
+    for i in range(len(path) - 1):
+        # Obtener los aeropuertos en el camino
+        source_airport = aeropuertos[path[i]]
+        dest_airport = aeropuertos[path[i + 1]]
+
+        # Convertir las coordenadas a píxeles
+        x1, y1 = mercator_projection(source_airport.latitude, source_airport.longitude, image_width, image_height)
+        x2, y2 = mercator_projection(dest_airport.latitude, dest_airport.longitude, image_width, image_height)
+
+        # Dibujar la línea del camino mínimo en verde
+        draw.line([(x1, y1), (x2, y2)], fill="green", width=2)
+
+    # Actualizar la imagen mostrada en el mapa
+    actualizar_imagen_con_dibujos(imagen_con_camino)
+
 # Crear la ventana de Tkinter
 raiz = tk.Tk()
 raiz.title("Flights map")
@@ -235,6 +267,16 @@ label_source = tk.Label(frame_botones, text="Source Code:")
 label_source.pack(pady=5)
 entry_source = tk.Entry(frame_botones)
 entry_source.pack(pady=5)
+
+label_destino = tk.Label(frame_botones, text="Destination Code:")
+label_destino.pack(pady=5)
+entry_destino = tk.Entry(frame_botones)
+entry_destino.pack(pady=5)
+
+# Crear un botón para calcular el camino mínimo desde el origen hasta el destino
+boton_camino_minimo = tk.Button(frame_botones, text="Calcular Camino Mínimo", command=calcular_camino_minimo)
+boton_camino_minimo.pack(pady=5)
+
 
 # Crear una lista para mostrar los aeropuertos adyacentes
 label_adyacentes = tk.Label(frame_botones, text="Aeropuertos adyacentes:")
