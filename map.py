@@ -97,71 +97,6 @@ def mercator_projection(latitude, longitude, image_width, image_height):
 
     return int(x), int(y)
 
-def mostrar_10_caminos_minimos_mas_lejanos():
-    # Obtener el código de aeropuerto de origen ingresado por el usuario
-    source_code = entry_source.get().strip().upper()
-    
-    # Verificar si el código de aeropuerto de origen es válido
-    if source_code not in aeropuertos:
-        print(f"El código de aeropuerto {source_code} no existe.")
-        return
-
-    # Inicializar diccionarios para almacenar distancias y predecesores
-    distancias = {airport: float('inf') for airport in aeropuertos}
-    predecesores = {airport: None for airport in aeropuertos}
-    
-    # Inicializar la distancia del aeropuerto de origen como 0
-    distancias[source_code] = 0
-    
-    # Crear una cola de prioridad para almacenar las distancias y los aeropuertos
-    pq = [(0, source_code)]
-    
-    # Ejecutar el algoritmo de Dijkstra para calcular las distancias mínimas
-    while pq:
-        # Obtener el aeropuerto con la menor distancia
-        distancia_actual, aeropuerto_actual = heapq.heappop(pq)
-        
-        # Recorrer los vuelos desde el aeropuerto actual
-        for flight in airport_graph.get_connections(aeropuerto_actual):
-            # Calcular la nueva distancia al aeropuerto de destino
-            nueva_distancia = distancia_actual + airport_graph.calculate_distance(flight.source_airport, flight.dest_airport)
-            
-            # Si la nueva distancia es menor, actualiza la distancia y el predecesor
-            if nueva_distancia < distancias[flight.dest_airport.code]:
-                distancias[flight.dest_airport.code] = nueva_distancia
-                predecesores[flight.dest_airport.code] = aeropuerto_actual
-                # Añadir la nueva distancia y aeropuerto de destino a la cola de prioridad
-                heapq.heappush(pq, (nueva_distancia, flight.dest_airport.code))
-    
-    # Crear una lista de distancias junto con los códigos de aeropuerto
-    distancias_con_codigo = [(distancia, codigo) for codigo, distancia in distancias.items()]
-    
-    # Ordenar la lista por distancia descendente para obtener los caminos más lejanos
-    distancias_con_codigo.sort(reverse=True, key=lambda x: x[0])
-    
-    # Seleccionar los 10 caminos más lejanos
-    caminos_mas_lejanos = distancias_con_codigo[:10]
-    
-    # Mostrar los caminos más lejanos en la consola
-    print(f"Los 10 caminos mínimos más lejanos desde {source_code} son:")
-    for i, (distancia, codigo_destino) in enumerate(caminos_mas_lejanos, start=1):
-        # Reconstruir el camino mínimo desde el origen hasta el destino
-        camino_minimo = []
-        aeropuerto_actual = codigo_destino
-        while aeropuerto_actual:
-            camino_minimo.append(aeropuerto_actual)
-            aeropuerto_actual = predecesores[aeropuerto_actual]
-        
-        # Invertir el camino mínimo para obtener el camino de origen a destino
-        camino_minimo.reverse()
-        
-        # Mostrar el camino mínimo y la distancia
-        print(f"{i}. Camino a {codigo_destino} (distancia: {distancia:.2f} km): {camino_minimo}")
-        
-        # Dibujar el camino mínimo en el mapa
-        dibujar_camino_minimo(camino_minimo)
-
-
 # Función para dibujar los adyacentes y los adyacentes más lejanos desde un aeropuerto de origen
 def dibujar_adyacentes():
     # Obtener el código de origen ingresado por el usuario
@@ -249,7 +184,6 @@ def dibujar_camino_minimo(camino_minimo):
 
     # Actualizar la imagen mostrada en el mapa con los dibujos del camino mínimo
     actualizar_imagen_con_dibujos(imagen_con_camino)
-
 
 # Función para actualizar la imagen mostrada en el mapa con dibujos adicionales
 def actualizar_imagen_con_dibujos(imagen_con_dibujos):
@@ -346,6 +280,7 @@ def calcular_camino_minimo():
     dibujar_camino_minimo(camino_minimo)
 
 
+
 # Crear la ventana de Tkinter
 raiz = tk.Tk()
 raiz.title("Flights map")
@@ -366,6 +301,19 @@ label_imagen.bind("<B1-Motion>", pan_image)
 frame_botones = tk.Frame(raiz)
 frame_botones.grid(row=0, column=1, sticky="ns")
 
+# Sub-marco para los botones de zoom, colocados horizontalmente
+zoom_frame = tk.Frame(frame_botones)
+zoom_frame.pack(pady=10)
+boton_zoom_in = tk.Button(zoom_frame, text="Zoom In", command=zoom_in)
+boton_zoom_in.pack(side=tk.LEFT, padx=2)  # side=tk.LEFT para alinear horizontalmente
+boton_zoom_out = tk.Button(zoom_frame, text="Zoom Out", command=zoom_out)
+boton_zoom_out.pack(side=tk.LEFT, padx=2)  # side=tk.LEFT para alinear horizontalmente
+
+
+# Botón para dibujar los aeropuertos en la imagen
+boton_dibujar = tk.Button(frame_botones, text="Dibujar Aeropuertos", command=dibujar_aeropuertos)
+boton_dibujar.pack(pady=5)
+
 # Crear campos de texto para los códigos de aeropuerto de origen
 label_source = tk.Label(frame_botones, text="Source Code:")
 label_source.pack(pady=5)
@@ -381,6 +329,32 @@ entry_destino.pack(pady=5)
 boton_camino_minimo = tk.Button(frame_botones, text="Calcular Camino Mínimo", command=calcular_camino_minimo)
 boton_camino_minimo.pack(pady=5)
 
+def mostrar_informacion():
+    airport_code = entry_info.get().strip().upper()
+    if airport_code not in aeropuertos:
+        label_info.config(text=f"No se encontró el aeropuerto con código {airport_code}")
+        return
+    
+    airport = aeropuertos[airport_code]
+    info_text = (
+        f"Código: {airport.code}\n"
+        f"Nombre: {airport.name}\n"
+        f"Ubicación: ({airport.latitude}, {airport.longitude})\n"
+        f"País: {airport.country}"
+    )
+    label_info.config(text=info_text)
+
+# Crear campos y botón para obtener información del aeropuerto
+label_info_entry = tk.Label(frame_botones, text="Ingrese código de aeropuerto:")
+label_info_entry.pack(pady=5)
+entry_info = tk.Entry(frame_botones)
+entry_info.pack(pady=5)
+boton_mostrar_info = tk.Button(frame_botones, text="Mostrar Información", command=mostrar_informacion)
+boton_mostrar_info.pack(pady=5)
+
+# Etiqueta para mostrar la información del aeropuerto
+label_info = tk.Label(frame_botones, text="", justify=tk.LEFT)
+label_info.pack(pady=5)
 
 # Crear una lista para mostrar los aeropuertos adyacentes
 label_adyacentes = tk.Label(frame_botones, text="Aeropuertos adyacentes:")
@@ -392,25 +366,10 @@ lista_adyacentes.pack(pady=5)
 boton_dibujar_adyacentes = tk.Button(frame_botones, text="Dibujar adyacentes", command=dibujar_adyacentes)
 boton_dibujar_adyacentes.pack(pady=5)
 
-# Botón para dibujar los aeropuertos en la imagen
-boton_dibujar = tk.Button(frame_botones, text="Dibujar Aeropuertos", command=dibujar_aeropuertos)
-boton_dibujar.pack(pady=5)
-
-# Botón para mostrar los 10 caminos mínimos más lejanos
-boton_10_caminos_minimos_mas_lejanos = tk.Button(frame_botones, text="Mostrar 10 caminos más lejanos", command=mostrar_10_caminos_minimos_mas_lejanos)
-boton_10_caminos_minimos_mas_lejanos.pack(pady=5)
-
-# Botón para hacer zoom in en la imagen
-boton_zoom_in = tk.Button(frame_botones, text="Zoom In", command=zoom_in)
-boton_zoom_in.pack(pady=5)
-
-# Botón para hacer zoom out en la imagen
-boton_zoom_out = tk.Button(frame_botones, text="Zoom Out", command=zoom_out)
-boton_zoom_out.pack(pady=5)
-
 # Botón para cerrar la ventana
 boton_cerrar = tk.Button(frame_botones, text="Cerrar", command=cerrar_ventana)
 boton_cerrar.pack(pady=5)
 
 # Ejecutar la aplicación
 raiz.mainloop()
+

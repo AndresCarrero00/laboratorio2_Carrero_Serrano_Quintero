@@ -50,54 +50,6 @@ class AirportGraph:
 
         return distance
     
-    # Método para encontrar el camino mínimo utilizando el algoritmo de Dijkstra
-    def shortest_path(self, source_code, dest_code):
-        # Verificar si los códigos de origen y destino existen
-        if source_code not in self.connections or dest_code not in self.connections:
-            print(f"Código de aeropuerto no encontrado: {source_code} o {dest_code}")
-            return []
-
-        # Diccionario para almacenar la distancia mínima a cada nodo
-        distances = {airport: float('inf') for airport in self.connections}
-        distances[source_code] = 0
-
-        # Diccionario para almacenar el nodo previo en el camino
-        previous = {airport: None for airport in self.connections}
-
-        # Cola de prioridad para seleccionar el nodo con la distancia mínima
-        priority_queue = [(0, source_code)]
-
-        while priority_queue:
-            # Extraer el nodo con la menor distancia
-            current_distance, current_airport = heapq.heappop(priority_queue)
-
-            #edgar
-            # Si el nodo actual es el destino, detener el algoritmo
-            if current_airport == dest_code:
-                break
-
-            # Recorrer las conexiones del aeropuerto actual
-            for flight in self.connections[current_airport]:
-                neighbor_airport = flight.dest_airport.code
-                distance_to_neighbor = current_distance + self.calculate_distance(flight.source_airport, flight.dest_airport)
-
-                # Si se encuentra una distancia menor, actualizar la información
-                if distance_to_neighbor < distances[neighbor_airport]:
-                    distances[neighbor_airport] = distance_to_neighbor
-                    previous[neighbor_airport] = current_airport
-                    heapq.heappush(priority_queue, (distance_to_neighbor, neighbor_airport))
-
-        # Reconstruir el camino mínimo desde el destino hasta el origen
-        path = []
-        current_airport = dest_code
-        while current_airport:
-            path.append(current_airport)
-            current_airport = previous[current_airport]
-
-        path.reverse()  # Invertir el camino para que empiece desde el origen
-        return path
-
-
 
 # Cargar los vuelos desde el archivo CSV y construir el grafo
 def build_airport_graph(csv_filename):
@@ -118,10 +70,4 @@ def build_airport_graph(csv_filename):
 
     return airport_graph
 
-# Ejemplo de uso
-airport_graph = build_airport_graph('flights.csv')
-connections_from_DFW = airport_graph.get_connections('DFW')
-for connection in connections_from_DFW:
-    print("Vuelo desde DFW a", connection.dest_airport.name)
-    distance = airport_graph.calculate_distance(connection.source_airport, connection.dest_airport)
-    print("Distancia:", distance, "kilómetros")
+
