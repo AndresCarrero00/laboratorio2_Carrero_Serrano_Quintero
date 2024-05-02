@@ -3,6 +3,7 @@ from PIL import Image, ImageTk, ImageDraw
 from math import pi, log, tan
 import csv
 from Lab2 import Airport, Flight, AirportGraph, build_airport_graph
+import heapq
 
 # Cargar la imagen del mapa del mundo con proyección de Mercator
 imagen_original = Image.open("Mercator.jpg")
@@ -96,8 +97,73 @@ def mercator_projection(latitude, longitude, image_width, image_height):
 
     return int(x), int(y)
 
+def mostrar_10_caminos_minimos_mas_lejanos():
+    # Obtener el código de aeropuerto de origen ingresado por el usuario
+    source_code = entry_source.get().strip().upper()
+    
+    # Verificar si el código de aeropuerto de origen es válido
+    if source_code not in aeropuertos:
+        print(f"El código de aeropuerto {source_code} no existe.")
+        return
+
+    # Inicializar diccionarios para almacenar distancias y predecesores
+    distancias = {airport: float('inf') for airport in aeropuertos}
+    predecesores = {airport: None for airport in aeropuertos}
+    
+    # Inicializar la distancia del aeropuerto de origen como 0
+    distancias[source_code] = 0
+    
+    # Crear una cola de prioridad para almacenar las distancias y los aeropuertos
+    pq = [(0, source_code)]
+    
+    # Ejecutar el algoritmo de Dijkstra para calcular las distancias mínimas
+    while pq:
+        # Obtener el aeropuerto con la menor distancia
+        distancia_actual, aeropuerto_actual = heapq.heappop(pq)
+        
+        # Recorrer los vuelos desde el aeropuerto actual
+        for flight in airport_graph.get_connections(aeropuerto_actual):
+            # Calcular la nueva distancia al aeropuerto de destino
+            nueva_distancia = distancia_actual + airport_graph.calculate_distance(flight.source_airport, flight.dest_airport)
+            
+            # Si la nueva distancia es menor, actualiza la distancia y el predecesor
+            if nueva_distancia < distancias[flight.dest_airport.code]:
+                distancias[flight.dest_airport.code] = nueva_distancia
+                predecesores[flight.dest_airport.code] = aeropuerto_actual
+                # Añadir la nueva distancia y aeropuerto de destino a la cola de prioridad
+                heapq.heappush(pq, (nueva_distancia, flight.dest_airport.code))
+    
+    # Crear una lista de distancias junto con los códigos de aeropuerto
+    distancias_con_codigo = [(distancia, codigo) for codigo, distancia in distancias.items()]
+    
+    # Ordenar la lista por distancia descendente para obtener los caminos más lejanos
+    distancias_con_codigo.sort(reverse=True, key=lambda x: x[0])
+    
+    # Seleccionar los 10 caminos más lejanos
+    caminos_mas_lejanos = distancias_con_codigo[:10]
+    
+    # Mostrar los caminos más lejanos en la consola
+    print(f"Los 10 caminos mínimos más lejanos desde {source_code} son:")
+    for i, (distancia, codigo_destino) in enumerate(caminos_mas_lejanos, start=1):
+        # Reconstruir el camino mínimo desde el origen hasta el destino
+        camino_minimo = []
+        aeropuerto_actual = codigo_destino
+        while aeropuerto_actual:
+            camino_minimo.append(aeropuerto_actual)
+            aeropuerto_actual = predecesores[aeropuerto_actual]
+        
+        # Invertir el camino mínimo para obtener el camino de origen a destino
+        camino_minimo.reverse()
+        
+        # Mostrar el camino mínimo y la distancia
+        print(f"{i}. Camino a {codigo_destino} (distancia: {distancia:.2f} km): {camino_minimo}")
+        
+        # Dibujar el camino mínimo en el mapa
+        dibujar_camino_minimo(camino_minimo)
+
+
 # Función para dibujar los adyacentes y los adyacentes más lejanos desde un aeropuerto de origen
-def dibujar_adyacentes_y_lejanos():
+def dibujar_adyacentes():
     # Obtener el código de origen ingresado por el usuario
     source_code = entry_source.get().strip().upper()
 
@@ -137,9 +203,6 @@ def dibujar_adyacentes_y_lejanos():
     # Ordenar los vuelos por distancia descendente
     distances.sort(reverse=True, key=lambda x: x[0])
 
-    # Asegurarnos de obtener los 10 vuelos más lejanos disponibles
-    top_10_flights = distances[:10]
-
     # Dibujar todos los vuelos adyacentes en azul
     for distancia, vuelo in distances:
         # Obtener coordenadas de origen y destino
@@ -156,22 +219,36 @@ def dibujar_adyacentes_y_lejanos():
         # Añadir el aeropuerto adyacente a la lista
         lista_adyacentes.insert(tk.END, f"Destino: {vuelo.dest_airport.code} Distancia: {distancia:.2f} km")
 
-    # Resaltar los 10 vuelos más lejanos en rojo
-    for distancia, vuelo in top_10_flights:
-        # Obtener coordenadas de origen y destino
-        source_coords = (vuelo.source_airport.latitude, vuelo.source_airport.longitude)
-        dest_coords = (vuelo.dest_airport.latitude, vuelo.dest_airport.longitude)
-
-        # Convertir coordenadas a píxeles
-        x1, y1 = mercator_projection(*source_coords, image_width, image_height)
-        x2, y2 = mercator_projection(*dest_coords, image_width, image_height)
-
-        # Dibujar la línea de vuelo más lejano en rojo
-        draw.line([(x1, y1), (x2, y2)], fill="red", width=2)
-
     # Actualizar la imagen mostrada en el mapa
     actualizar_imagen_con_dibujos(imagen_con_lineas)
 
+def dibujar_camino_minimo(camino_minimo):
+    # Copiar la imagen original para dibujar el camino mínimo
+    imagen_con_camino = imagen_original.copy()
+    draw = ImageDraw.Draw(imagen_con_camino)
+
+    # Obtener dimensiones de la imagen
+    image_width, image_height = imagen_con_camino.size
+
+    # Iterar sobre los aeropuertos en el camino mínimo
+    for i in range(len(camino_minimo) - 1):
+        # Obtener el código de los aeropuertos actual y siguiente
+        airport_code_actual = camino_minimo[i]
+        airport_code_siguiente = camino_minimo[i + 1]
+        
+        # Obtener los aeropuertos a partir de los códigos
+        aeropuerto_actual = aeropuertos[airport_code_actual]
+        aeropuerto_siguiente = aeropuertos[airport_code_siguiente]
+        
+        # Convertir coordenadas a píxeles
+        x1, y1 = mercator_projection(aeropuerto_actual.latitude, aeropuerto_actual.longitude, image_width, image_height)
+        x2, y2 = mercator_projection(aeropuerto_siguiente.latitude, aeropuerto_siguiente.longitude, image_width, image_height)
+
+        # Dibujar la línea verde que conecta los aeropuertos
+        draw.line([(x1, y1), (x2, y2)], fill="purple", width=2)
+
+    # Actualizar la imagen mostrada en el mapa con los dibujos del camino mínimo
+    actualizar_imagen_con_dibujos(imagen_con_camino)
 
 
 # Función para actualizar la imagen mostrada en el mapa con dibujos adicionales
@@ -210,37 +287,64 @@ def pan_image(event):
     # Actualizar la posición del mouse
     prev_x, prev_y = event.x, event.y
 
-# Función para calcular y dibujar el camino mínimo
 def calcular_camino_minimo():
-    # Obtener los códigos de origen y destino
+    # Obtener los códigos de aeropuerto de origen y destino ingresados por el usuario
     source_code = entry_source.get().strip().upper()
     dest_code = entry_destino.get().strip().upper()
+    
+    # Verificar si los códigos de los aeropuertos son válidos
+    if source_code not in aeropuertos or dest_code not in aeropuertos:
+        print("Los códigos de aeropuerto ingresados no son válidos.")
+        return
+    
+    # Inicializar diccionarios para almacenar distancias y predecesores
+    distancias = {airport: float('inf') for airport in aeropuertos}
+    predecesores = {airport: None for airport in aeropuertos}
+    
+    # Inicializar la distancia del aeropuerto de origen como 0
+    distancias[source_code] = 0
+    
+    # Crear una cola de prioridad para almacenar las distancias y los aeropuertos
+    pq = [(0, source_code)]
+    
+    # Ejecutar el algoritmo de Dijkstra
+    while pq:
+        # Obtener el aeropuerto con la menor distancia
+        distancia_actual, aeropuerto_actual = heapq.heappop(pq)
+        
+        # Verificar si el aeropuerto actual es el destino
+        if aeropuerto_actual == dest_code:
+            break
+        
+        # Recorrer los vuelos desde el aeropuerto actual
+        for flight in airport_graph.get_connections(aeropuerto_actual):
+            # Calcular la nueva distancia al aeropuerto de destino
+            nueva_distancia = distancia_actual + airport_graph.calculate_distance(flight.source_airport, flight.dest_airport)
+            
+            # Si la nueva distancia es menor, actualiza la distancia y el predecesor
+            if nueva_distancia < distancias[flight.dest_airport.code]:
+                distancias[flight.dest_airport.code] = nueva_distancia
+                predecesores[flight.dest_airport.code] = aeropuerto_actual
+                # Añadir la nueva distancia y aeropuerto de destino a la cola de prioridad
+                heapq.heappush(pq, (nueva_distancia, flight.dest_airport.code))
+    
+    # Reconstruir el camino mínimo desde el destino hasta el origen
+    camino_minimo = []
+    aeropuerto_actual = dest_code
+    while aeropuerto_actual:
+        camino_minimo.append(aeropuerto_actual)
+        aeropuerto_actual = predecesores[aeropuerto_actual]
+    
+    # Invertir el camino mínimo para obtener el camino de origen a destino
+    camino_minimo.reverse()
+    
+    print(f"Camino mínimo desde {source_code} hasta {dest_code}:")
+    for i, airport in enumerate(camino_minimo):
+        print(f"{i + 1}. {airport}")
+    
+    # Llamar a dibujar_camino_minimo para dibujar el camino en el mapa
+    dibujar_camino_minimo(camino_minimo)
 
-    # Calcular el camino mínimo
-    path = airport_graph.shortest_path(source_code, dest_code)
-
-    # Copiar la imagen original para dibujar el camino mínimo
-    imagen_con_camino = imagen_original.copy()
-    draw = ImageDraw.Draw(imagen_con_camino)
-
-    # Obtener dimensiones de la imagen
-    image_width, image_height = imagen_con_camino.size
-
-    # Dibujar el camino mínimo en la imagen
-    for i in range(len(path) - 1):
-        # Obtener los aeropuertos en el camino
-        source_airport = aeropuertos[path[i]]
-        dest_airport = aeropuertos[path[i + 1]]
-
-        # Convertir las coordenadas a píxeles
-        x1, y1 = mercator_projection(source_airport.latitude, source_airport.longitude, image_width, image_height)
-        x2, y2 = mercator_projection(dest_airport.latitude, dest_airport.longitude, image_width, image_height)
-
-        # Dibujar la línea del camino mínimo en verde
-        draw.line([(x1, y1), (x2, y2)], fill="green", width=2)
-
-    # Actualizar la imagen mostrada en el mapa
-    actualizar_imagen_con_dibujos(imagen_con_camino)
 
 # Crear la ventana de Tkinter
 raiz = tk.Tk()
@@ -285,8 +389,16 @@ lista_adyacentes = tk.Listbox(frame_botones, width=40)
 lista_adyacentes.pack(pady=5)
 
 # Botón para dibujar los vuelos adyacentes y resaltar los 10 más lejanos
-boton_dibujar_adyacentes = tk.Button(frame_botones, text="Dibujar adyacentes y lejanos", command=dibujar_adyacentes_y_lejanos)
+boton_dibujar_adyacentes = tk.Button(frame_botones, text="Dibujar adyacentes", command=dibujar_adyacentes)
 boton_dibujar_adyacentes.pack(pady=5)
+
+# Botón para dibujar los aeropuertos en la imagen
+boton_dibujar = tk.Button(frame_botones, text="Dibujar Aeropuertos", command=dibujar_aeropuertos)
+boton_dibujar.pack(pady=5)
+
+# Botón para mostrar los 10 caminos mínimos más lejanos
+boton_10_caminos_minimos_mas_lejanos = tk.Button(frame_botones, text="Mostrar 10 caminos más lejanos", command=mostrar_10_caminos_minimos_mas_lejanos)
+boton_10_caminos_minimos_mas_lejanos.pack(pady=5)
 
 # Botón para hacer zoom in en la imagen
 boton_zoom_in = tk.Button(frame_botones, text="Zoom In", command=zoom_in)
@@ -295,10 +407,6 @@ boton_zoom_in.pack(pady=5)
 # Botón para hacer zoom out en la imagen
 boton_zoom_out = tk.Button(frame_botones, text="Zoom Out", command=zoom_out)
 boton_zoom_out.pack(pady=5)
-
-# Botón para dibujar los aeropuertos en la imagen
-boton_dibujar = tk.Button(frame_botones, text="Dibujar Aeropuertos", command=dibujar_aeropuertos)
-boton_dibujar.pack(pady=5)
 
 # Botón para cerrar la ventana
 boton_cerrar = tk.Button(frame_botones, text="Cerrar", command=cerrar_ventana)
